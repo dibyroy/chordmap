@@ -205,3 +205,26 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Project plan (kept local, not published)
+plan.md
+
+# Audio test data
+data/*.mp3
+data/*.wav
+data/*.flac
+data/*.m4a
+
+# Eval run outputs
+backend/evals/runs/*.json
+
+# Node
+node_modules/
+.next/
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+
+# Env
+.env.local
+.env.*.local
