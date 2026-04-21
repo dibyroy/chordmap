@@ -40,6 +40,23 @@ def test_uniform_fallback_covers_full_duration():
     assert timings[-1].end == pytest.approx(9.0, abs=0.01)
 
 
+def test_uniform_fallback_respects_onset():
+    from pipeline.align import _uniform_fallback
+
+    # With an 8s intro, words should start at 8s not 0s
+    timings = _uniform_fallback("one two three", duration=11.0, onset=8.0)
+    assert timings[0].start == pytest.approx(8.0)
+    assert timings[-1].end == pytest.approx(11.0, abs=0.01)
+
+
+def test_uniform_fallback_onset_zero_unchanged():
+    from pipeline.align import _uniform_fallback
+
+    timings = _uniform_fallback("one two", duration=4.0, onset=0.0)
+    assert timings[0].start == pytest.approx(0.0)
+    assert timings[-1].end == pytest.approx(4.0, abs=0.01)
+
+
 # WhisperX integration test — only runs when model weights are available
 @pytest.mark.skipif(
     True,  # flip to False to run manually after `pip install whisperx`

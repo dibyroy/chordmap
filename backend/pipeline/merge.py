@@ -9,6 +9,10 @@ from pipeline.chords import ChordEvent
 from pipeline.align import WordTiming
 
 SNAP_THRESHOLD_MS = 200
+# Chord changes often land just before the downbeat word (musician plays the
+# chord slightly ahead of the beat). Allow this window so those chords aren't
+# silently dropped.
+PRE_ROLL_S = 0.1
 
 
 class LyricLine(BaseModel):
@@ -112,7 +116,7 @@ def _build_line(words: list[WordTiming], chords: list[ChordEvent]) -> LyricLine:
     markers: list[dict] = []
 
     for chord in chords:
-        if not (line_start <= chord.start <= line_end):
+        if not ((line_start - PRE_ROLL_S) <= chord.start <= line_end):
             continue
 
         nearest_pos, nearest_dist = _nearest_word(words, chord.start)

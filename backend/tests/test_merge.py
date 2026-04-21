@@ -112,6 +112,19 @@ def test_lyrics_chord_placed_on_correct_line():
     assert lines[1].chord_markers[0]["chord"] == "Am"
 
 
+def test_chord_just_before_line_start_attached():
+    # Chord fires 50ms before the first word — common when the musician plays
+    # the chord slightly ahead of the beat. Should attach to position 0.
+    ws = words(("hello", 1.0, 1.5), ("world", 1.6, 2.0))
+    cs = chords((0.95, 2.0, "C"))  # starts 50ms before "hello"
+
+    lines = merge(cs, ws)
+
+    assert len(lines[0].chord_markers) == 1
+    assert lines[0].chord_markers[0]["chord"] == "C"
+    assert lines[0].chord_markers[0]["position"] == 0
+
+
 def test_lyrics_fallback_when_alignment_short():
     # alignment returned fewer words than lyrics contain
     ws = words(("hello", 0.0, 0.5))  # only 1 word
