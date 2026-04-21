@@ -6,10 +6,10 @@ Log of non-obvious choices made during the build. Each entry answers: what was t
 
 ## Audio Processing
 
-### autochord over Chordino
-- **Decision:** Use autochord as the primary chord detector.
-- **Alternatives considered:** Chordino (VAMP plugin), madmom, deep learning models.
-- **Reason:** autochord wraps a pre-trained model with a simple Python API. Chordino requires VAMP host setup. madmom is more powerful but heavier. For v1, autochord ships faster.
+### librosa chromagram over autochord
+- **Decision:** Use librosa CQT chromagram + cosine-similarity template matching for chord detection.
+- **Alternatives considered:** autochord (originally chosen), Chordino (VAMP plugin), madmom.
+- **Reason:** autochord depends on `vamp`, which requires native VAMP SDK binaries. These fail to build on Windows (`ModuleNotFoundError: No module named 'numpy'` at build time, and no pre-built wheel). The librosa approach uses the same algorithmic idea (chroma template matching) with zero native dependencies. madmom would be more accurate but is heavier and also has build issues on Windows.
 
 ### WhisperX for forced alignment
 - **Decision:** Use WhisperX instead of plain Whisper.

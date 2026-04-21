@@ -1,4 +1,10 @@
-"""End-to-end pipeline runner. CLI: python -m pipeline.run <audio> <lyrics>."""
+"""End-to-end pipeline runner.
+
+CLI usage:
+    python -m pipeline.run <audio_path> <lyrics_path>
+
+Output: JSON to stdout.
+"""
 from __future__ import annotations
 
 import json
@@ -8,36 +14,35 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from pipeline.preprocess import preprocess
-from pipeline.chords import detect_chords
-from pipeline.align import align_lyrics
-from pipeline.merge import merge
-from pipeline.analyze import analyze
+from pipeline.chords import ChordEvent, detect_chords
+from pipeline.align import WordTiming, align_lyrics
+from pipeline.merge import LyricLine, merge
+from pipeline.analyze import AnalysisResult, analyze
 
 
 class SongResult(BaseModel):
-    chords: list[dict]
-    words: list[dict]
-    lines: list[dict]
-    analysis: dict
+    chords: list[ChordEvent]
+    words: list[WordTiming]
+    lines: list[LyricLine]
+    analysis: AnalysisResult
 
 
 def process_song(audio_path: str, lyrics: str) -> SongResult:
+    """Run all five pipeline stages and return a complete result."""
     audio, sr = preprocess(audio_path)
     chords = detect_chords(audio, sr)
     words = align_lyrics(audio, sr, lyrics)
     lines = merge(chords, words)
     analysis = analyze([c.model_dump() for c in chords])
-    return SongResult(
-        chords=[c.model_dump() for c in chords],
-        words=[w.model_dump() for w in words],
-        lines=[l.model_dump() for l in lines],
-        analysis=analysis.model_dump(),
-    )
+    return SongResult(chords=chords, words=words, lines=lines, analysis=analysis)
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python -m pipeline.run <audio_path> <lyrics_path>", file=sys.stderr)
+        sys.exit(1)
+
     audio_path = sys.argv[1]
-    lyrics_path = sys.argv[2]
-    lyrics = Path(lyrics_path).read_text()
+    lyrics = Path(sys.argv[2]).read_text()
     result = process_song(audio_path, lyrics)
     print(json.dumps(result.model_dump(), indent=2))
