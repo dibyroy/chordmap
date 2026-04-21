@@ -35,13 +35,15 @@ def align_lyrics(audio: np.ndarray, sr: int, lyrics: str) -> list[WordTiming]:
         model_name="facebook/wav2vec2-base-960h",
     )
 
-    audio_f32 = audio.astype(np.float32)
+    # wav2vec2 expects 16 kHz mono audio
+    import librosa
+    audio_16k = librosa.resample(audio.astype(np.float32), orig_sr=sr, target_sr=16000)
+
     result = whisperx.align(
         segments,
         model_a,
         metadata,
-        audio_f32,
-        sr,
+        audio_16k,
         device,
         return_char_alignments=False,
     )
