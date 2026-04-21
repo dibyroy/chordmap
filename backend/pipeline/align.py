@@ -18,15 +18,22 @@ def align_lyrics(audio: np.ndarray, sr: int, lyrics: str) -> list[WordTiming]:
     then assigns word-level timestamps. Falls back to uniform spacing if
     any word has no timestamp (can happen with low-quality audio).
     """
-    import torch
     import whisperx
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Force CPU — wav2vec2 alignment is fast enough on CPU.
+    # Explicitly use the HuggingFace model name to bypass the torchaudio bundle
+    # path (WAV2VEC2_ASR_BASE_960H), which raises RuntimeError on Windows with
+    # torchaudio 2.8.0 due to an accelerator-detection bug.
+    device = "cpu"
     duration = len(audio) / sr
 
     segments = [{"start": 0.0, "end": duration, "text": lyrics}]
 
-    model_a, metadata = whisperx.load_align_model(language_code="en", device=device)
+    model_a, metadata = whisperx.load_align_model(
+        language_code="en",
+        device=device,
+        model_name="facebook/wav2vec2-base-960h",
+    )
 
     audio_f32 = audio.astype(np.float32)
     result = whisperx.align(
