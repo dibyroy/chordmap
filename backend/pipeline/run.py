@@ -32,7 +32,7 @@ def process_song(audio_path: str, lyrics: str) -> SongResult:
     audio, sr = preprocess(audio_path)
     chords = detect_chords(audio, sr)
     words = align_lyrics(audio, sr, lyrics)
-    lines = merge(chords, words)
+    lines = merge(chords, words, lyrics)
     analysis = analyze([c.model_dump() for c in chords])
     return SongResult(chords=chords, words=words, lines=lines, analysis=analysis)
 

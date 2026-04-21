@@ -20,7 +20,7 @@ col_left, col_right = st.columns([1, 1])
 
 with col_left:
     audio_file = st.file_uploader("Audio file (mp3 / wav / flac)", type=["mp3", "wav", "flac", "m4a"])
-    run_alignment = st.checkbox("Run lyric alignment (WhisperX — downloads ~1 GB on first run)", value=False)
+    run_alignment = st.checkbox("Run lyric alignment (WhisperX — downloads ~360 MB on first run)", value=False)
 
 with col_right:
     lyrics = st.text_area("Lyrics (required for alignment)", height=200,
@@ -72,58 +72,82 @@ if chords:
     df["confidence"] = df["confidence"].round(3)
     st.dataframe(df[["start", "end", "duration", "chord", "confidence"]], width="stretch")
 
-    # Chord change timeline
     unique_chords = [c.chord for c in chords]
     st.write("**Progression:** " + "  →  ".join(unique_chords))
 else:
     st.warning("No chords detected — try a longer or clearer audio clip.")
 
 # ── stage 3 + 4: alignment + merge (optional) ────────────────────────────────
-if run_alignment:
-    if not lyrics.strip():
-        st.warning("Paste some lyrics to run alignment.")
-        st.stop()
-
-    with st.status("Stage 3 — aligning lyrics (WhisperX)…", expanded=True) as status:
-        from pipeline.align import align_lyrics
-
-        t0 = time.perf_counter()
-        words = align_lyrics(audio, sr, lyrics)
-        elapsed = time.perf_counter() - t0
-
-        st.write(f"✓ {len(words)} word timestamps  ·  {elapsed:.2f}s")
-        status.update(label="Stage 3 — done", state="complete")
-
-    with st.status("Stage 4 — merging chords + lyrics…", expanded=True) as status:
-        from pipeline.merge import merge
-
-        t0 = time.perf_counter()
-        lines = merge(chords, words)
-        elapsed = time.perf_counter() - t0
-
-        st.write(f"✓ {len(lines)} lyric lines  ·  {elapsed:.2f}s")
-        status.update(label="Stage 4 — done", state="complete")
-
-    st.subheader("Chord sheet")
-    for line in lines:
-        # Render chord markers above words
-        chord_row = [""] * len(line.words)
-        for m in line.chord_markers:
-            pos = m["position"]
-            if pos < len(chord_row):
-                chord_row[pos] = m["chord"]
-
-        chords_str = "  ".join(f"{c:<8}" if c else " " * 8 for c in chord_row).rstrip()
-        words_str  = "  ".join(f"{w:<8}" for w in line.words).rstrip()
-
-        if chords_str.strip():
-            st.code(chords_str + "\n" + words_str, language=None)
-        else:
-            st.code(words_str, language=None)
-else:
+if not run_alignment:
     st.info("Enable 'Run lyric alignment' above to see the chord sheet.")
+    try:
+        os.unlink(tmp_path)
+    except OSError:
+        pass
+    st.stop()
 
-# cleanup temp file
+if not lyrics.strip():
+    st.warning("Paste some lyrics to run alignment.")
+    st.stop()
+
+with st.status("Stage 3 — aligning lyrics (WhisperX)…", expanded=True) as status:
+    from pipeline.align import align_lyrics
+
+    t0 = time.perf_counter()
+    words = align_lyrics(audio, sr, lyrics)
+    elapsed = time.perf_counter() - t0
+
+    st.write(f"✓ {len(words)} word timestamps  ·  {elapsed:.2f}s")
+
+    # Word count sanity check
+    expected_words = len(lyrics.split())
+    delta = len(words) - expected_words
+    if abs(delta) > expected_words * 0.1:
+        st.warning(f"⚠ Expected ~{expected_words} words, got {len(words)} "
+                   f"({delta:+d}). Alignment may have drifted.")
+
+    status.update(label="Stage 3 — done", state="complete")
+
+# ── diagnostics expander ──────────────────────────────────────────────────────
+with st.expander("🔍 Diagnostics — raw word timings"):
+    wdf = pd.DataFrame([w.model_dump() for w in words])
+    wdf["start"] = wdf["start"].round(3)
+    wdf["end"] = wdf["end"].round(3)
+    wdf["duration"] = (wdf["end"] - wdf["start"]).round(3)
+    st.dataframe(wdf, width="stretch")
+
+    st.caption(f"Expected {expected_words} words from lyrics · "
+               f"WhisperX returned {len(words)} words · "
+               f"Audio duration {duration_s:.1f}s")
+
+with st.status("Stage 4 — merging chords + lyrics…", expanded=True) as status:
+    from pipeline.merge import merge
+
+    t0 = time.perf_counter()
+    lines = merge(chords, words, lyrics)
+    elapsed = time.perf_counter() - t0
+
+    st.write(f"✓ {len(lines)} lyric lines  ·  {elapsed:.2f}s")
+    status.update(label="Stage 4 — done", state="complete")
+
+# ── chord sheet ───────────────────────────────────────────────────────────────
+st.subheader("Chord sheet")
+
+for line in lines:
+    chord_row = [""] * len(line.words)
+    for m in line.chord_markers:
+        pos = m["position"]
+        if pos < len(chord_row):
+            chord_row[pos] = m["chord"]
+
+    chords_str = "  ".join(f"{c:<8}" if c else " " * 8 for c in chord_row).rstrip()
+    words_str  = "  ".join(f"{w:<8}" for w in line.words).rstrip()
+
+    if chords_str.strip():
+        st.code(chords_str + "\n" + words_str, language=None)
+    else:
+        st.code(words_str, language=None)
+
 try:
     os.unlink(tmp_path)
 except OSError:
