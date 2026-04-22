@@ -48,11 +48,13 @@ def align_lyrics(
             {"start": s["start"], "end": s["end"], "text": s["text"]}
             for s in whisper_segments
         ]
-        effective_lyrics = " ".join(s["text"].strip() for s in whisper_segments)
+        # Join with newlines so merge() preserves Whisper's phrase boundaries as lines.
+        raw = "\n".join(s["text"].strip() for s in whisper_segments)
+        effective_lyrics = _wrap_long_lines(raw)
     else:
         # Keep Whisper's timestamps but distribute user-provided lyrics across them.
         segments = _map_lyrics_to_segments(whisper_segments, lyrics)
-        effective_lyrics = lyrics
+        effective_lyrics = _wrap_long_lines(lyrics)
 
     # Step 3: WhisperX forced alignment for word-level timestamps.
     model_a, metadata = whisperx.load_align_model(
@@ -119,6 +121,24 @@ def _map_lyrics_to_segments(
         })
 
     return result
+
+
+def _wrap_long_lines(text: str, max_words: int = 10) -> str:
+    """Split any line longer than max_words at its midpoint.
+
+    Keeps the resulting structure close to what a human would write in a
+    chord chart — roughly one sung phrase per line.
+    """
+    out: list[str] = []
+    for line in text.splitlines():
+        words = line.split()
+        if len(words) <= max_words:
+            out.append(line)
+        else:
+            mid = len(words) // 2
+            out.append(" ".join(words[:mid]))
+            out.append(" ".join(words[mid:]))
+    return "\n".join(out)
 
 
 def _uniform_fallback(lyrics: str, duration: float) -> list[WordTiming]:

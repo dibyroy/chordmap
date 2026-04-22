@@ -131,20 +131,45 @@ with st.status("Stage 4 — merging chords + lyrics…", expanded=True) as statu
 # ── chord sheet ───────────────────────────────────────────────────────────────
 st.subheader("Chord sheet")
 
+def _render_ug_line(words: list[str], chord_markers: list[dict]) -> str:
+    """Return a two-row string with chords above lyrics, UltimateGuitar style.
+
+    Chords are placed at the character offset of the word they fall on.
+    A minimum gap of one space is enforced between consecutive chords.
+    """
+    lyrics_line = " ".join(words)
+
+    # Map word index → character offset in lyrics_line
+    char_offsets: list[int] = []
+    pos = 0
+    for w in words:
+        char_offsets.append(pos)
+        pos += len(w) + 1  # +1 for the space
+
+    chord_line = list(" " * len(lyrics_line))
+    write_until = 0  # tracks where the last chord ended
+
+    for marker in sorted(chord_markers, key=lambda m: m["position"]):
+        idx = marker["position"]
+        chord = marker["chord"]
+        if idx >= len(char_offsets):
+            continue
+        start = max(char_offsets[idx], write_until)
+        # Expand chord_line if the chord runs past the end of the lyrics
+        needed = start + len(chord)
+        if needed > len(chord_line):
+            chord_line.extend([" "] * (needed - len(chord_line)))
+        for i, ch in enumerate(chord):
+            chord_line[start + i] = ch
+        write_until = start + len(chord) + 1
+
+    chord_str = "".join(chord_line).rstrip()
+    return f"{chord_str}\n{lyrics_line}" if chord_str.strip() else lyrics_line
+
+
 for line in lines:
-    chord_row = [""] * len(line.words)
-    for m in line.chord_markers:
-        pos = m["position"]
-        if pos < len(chord_row):
-            chord_row[pos] = m["chord"]
-
-    chords_str = "  ".join(f"{c:<8}" if c else " " * 8 for c in chord_row).rstrip()
-    words_str  = "  ".join(f"{w:<8}" for w in line.words).rstrip()
-
-    if chords_str.strip():
-        st.code(chords_str + "\n" + words_str, language=None)
-    else:
-        st.code(words_str, language=None)
+    rendered = _render_ug_line(line.words, line.chord_markers)
+    st.code(rendered, language=None)
 
 try:
     os.unlink(tmp_path)
