@@ -39,7 +39,11 @@ def align_lyrics(
     whisper_mdl = whisperx.load_model(whisper_model_size, device, compute_type="float32")
     transcription = whisper_mdl.transcribe(audio_16k, batch_size=8)
     whisper_segments = transcription.get("segments", [])
-    language = transcription.get("language", "en")
+    # Require high confidence before treating as non-English — low scores are
+    # usually misdetections on songs with heavy music and sparse vocals.
+    raw_language = transcription.get("language", "en")
+    lang_prob = transcription.get("language_probability", 1.0)
+    language = raw_language if lang_prob >= 0.8 else "en"
 
     if not whisper_segments:
         effective = lyrics or ""
