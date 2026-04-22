@@ -39,11 +39,12 @@ def align_lyrics(
     whisper_mdl = whisperx.load_model(whisper_model_size, device, compute_type="float32")
     transcription = whisper_mdl.transcribe(audio_16k, batch_size=8)
     whisper_segments = transcription.get("segments", [])
-    # Require high confidence before treating as non-English — low scores are
-    # usually misdetections on songs with heavy music and sparse vocals.
-    raw_language = transcription.get("language", "en")
+    # align_language: used only to pick the alignment model. Require high
+    # confidence before using a non-English model — low scores are usually
+    # misdetections on songs with heavy music and sparse vocals.
+    detected_language = transcription.get("language", "en")
     lang_prob = transcription.get("language_probability", 1.0)
-    language = raw_language if lang_prob >= 0.8 else "en"
+    language = detected_language if lang_prob >= 0.8 else "en"
 
     if not whisper_segments:
         effective = lyrics or ""
@@ -66,10 +67,9 @@ def align_lyrics(
         effective_lyrics = _wrap_long_lines(lyrics)
     else:
         raw = "\n".join(s["text"].strip() for s in whisper_segments)
-        if language != "en":
-            # Transliterate non-Latin scripts to Latin characters so the chord
-            # sheet is readable without knowing the original script. Pronunciation
-            # is preserved; meaning is NOT translated.
+        # Transliterate based on actual script content, not language confidence.
+        # anyascii is a no-op on already-ASCII text, so this is always safe.
+        if _has_non_ascii(raw):
             raw = _transliterate(raw)
         effective_lyrics = _wrap_long_lines(raw)
 
@@ -118,6 +118,10 @@ def _forced_align(
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
+
+def _has_non_ascii(text: str) -> bool:
+    return any(ord(c) > 127 for c in text)
 
 
 def _transliterate(text: str) -> str:
