@@ -209,6 +209,9 @@ __marimo__/
 # Project plan (kept local, not published)
 plan.md
 
+# Claude Code per-session tool permissions (machine-specific, auto-generated)
+.claude/settings.local.json
+
 # Audio test data
 data/*.mp3
 data/*.wav
