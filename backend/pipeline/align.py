@@ -67,10 +67,14 @@ def align_lyrics(
         effective_lyrics = _wrap_long_lines(lyrics)
     else:
         raw = "\n".join(s["text"].strip() for s in whisper_segments)
-        # Transliterate based on actual script content, not language confidence.
-        # anyascii is a no-op on already-ASCII text, so this is always safe.
         if _has_non_ascii(raw):
             raw = _transliterate(raw)
+            # Transliterate the word-level text too — merge() builds the chord
+            # sheet from WordTiming.word, not from effective_lyrics.
+            timings = [
+                WordTiming(word=_transliterate(t.word), start=t.start, end=t.end)
+                for t in timings
+            ]
         effective_lyrics = _wrap_long_lines(raw)
 
     return timings, effective_lyrics
