@@ -132,22 +132,17 @@ with st.status("Stage 4 — merging chords + lyrics…", expanded=True) as statu
 st.subheader("Chord sheet")
 
 def _render_ug_line(words: list[str], chord_markers: list[dict]) -> str:
-    """Return a two-row string with chords above lyrics, UltimateGuitar style.
-
-    Chords are placed at the character offset of the word they fall on.
-    A minimum gap of one space is enforced between consecutive chords.
-    """
+    """Return a two-row string with chords above lyrics, UltimateGuitar style."""
     lyrics_line = " ".join(words)
 
-    # Map word index → character offset in lyrics_line
     char_offsets: list[int] = []
     pos = 0
     for w in words:
         char_offsets.append(pos)
-        pos += len(w) + 1  # +1 for the space
+        pos += len(w) + 1
 
     chord_line = list(" " * len(lyrics_line))
-    write_until = 0  # tracks where the last chord ended
+    write_until = 0
 
     for marker in sorted(chord_markers, key=lambda m: m["position"]):
         idx = marker["position"]
@@ -155,7 +150,6 @@ def _render_ug_line(words: list[str], chord_markers: list[dict]) -> str:
         if idx >= len(char_offsets):
             continue
         start = max(char_offsets[idx], write_until)
-        # Expand chord_line if the chord runs past the end of the lyrics
         needed = start + len(chord)
         if needed > len(chord_line):
             chord_line.extend([" "] * (needed - len(chord_line)))
@@ -167,8 +161,21 @@ def _render_ug_line(words: list[str], chord_markers: list[dict]) -> str:
     return f"{chord_str}\n{lyrics_line}" if chord_str.strip() else lyrics_line
 
 
+def _render_instrumental_line(chord_markers: list[dict]) -> str:
+    """Render an instrumental section: chords evenly spaced above the label."""
+    chords = [m["chord"] for m in sorted(chord_markers, key=lambda m: m["position"])]
+    if not chords:
+        return "[Instrumental]"
+    slot = max(max(len(c) for c in chords) + 2, 6)
+    chord_line = "".join(f"{c:<{slot}}" for c in chords).rstrip()
+    return f"{chord_line}\n[Instrumental]"
+
+
 for line in lines:
-    rendered = _render_ug_line(line.words, line.chord_markers)
+    if line.is_instrumental:
+        rendered = _render_instrumental_line(line.chord_markers)
+    else:
+        rendered = _render_ug_line(line.words, line.chord_markers)
     st.code(rendered, language=None)
 
 try:
