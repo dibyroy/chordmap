@@ -27,7 +27,7 @@ def health() -> dict:
 @app.post("/analyze", response_model=SongResult)
 async def analyze(
     audio: UploadFile = File(...),
-    lyrics: str = Form(...),
+    lyrics: str | None = Form(None),
 ) -> SongResult:
     with tempfile.NamedTemporaryFile(suffix=Path(audio.filename).suffix, delete=False) as tmp:
         tmp.write(await audio.read())

@@ -10,11 +10,11 @@ export default function Home() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!audioFile || !lyrics) return;
+    if (!audioFile) return;
 
     const form = new FormData();
     form.append("audio", audioFile);
-    form.append("lyrics", lyrics);
+    if (lyrics.trim()) form.append("lyrics", lyrics);
 
     setLoading(true);
     try {
@@ -40,18 +40,18 @@ export default function Home() {
           />
         </div>
         <div>
-          <label className="block text-sm mb-1">Lyrics</label>
+          <label className="block text-sm mb-1">Lyrics <span className="text-gray-500">(optional — leave blank to auto-transcribe)</span></label>
           <textarea
             value={lyrics}
             onChange={(e) => setLyrics(e.target.value)}
             rows={10}
-            placeholder="Paste lyrics here..."
+            placeholder="Paste lyrics here, or leave blank to use Whisper large-v3..."
             className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm"
           />
         </div>
         <button
           type="submit"
-          disabled={loading || !audioFile || !lyrics}
+          disabled={loading || !audioFile}
           className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 px-4 py-2 rounded text-sm"
         >
           {loading ? "Analyzing..." : "Analyze"}

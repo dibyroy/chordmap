@@ -1,7 +1,7 @@
 """End-to-end pipeline runner.
 
 CLI usage:
-    python -m pipeline.run <audio_path> <lyrics_path>
+    python -m pipeline.run <audio_path> [lyrics_path]
 
 Output: JSON to stdout.
 """
@@ -27,22 +27,22 @@ class SongResult(BaseModel):
     analysis: AnalysisResult
 
 
-def process_song(audio_path: str, lyrics: str) -> SongResult:
+def process_song(audio_path: str, lyrics: str | None = None) -> SongResult:
     """Run all five pipeline stages and return a complete result."""
     audio, sr = preprocess(audio_path)
     chords = detect_chords(audio, sr)
-    words = align_lyrics(audio, sr, lyrics)
-    lines = merge(chords, words, lyrics)
+    words, effective_lyrics = align_lyrics(audio, sr, lyrics)
+    lines = merge(chords, words, effective_lyrics)
     analysis = analyze([c.model_dump() for c in chords])
     return SongResult(chords=chords, words=words, lines=lines, analysis=analysis)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python -m pipeline.run <audio_path> <lyrics_path>", file=sys.stderr)
+    if len(sys.argv) not in (2, 3):
+        print("Usage: python -m pipeline.run <audio_path> [lyrics_path]", file=sys.stderr)
         sys.exit(1)
 
     audio_path = sys.argv[1]
-    lyrics = Path(sys.argv[2]).read_text()
+    lyrics = Path(sys.argv[2]).read_text() if len(sys.argv) == 3 else None
     result = process_song(audio_path, lyrics)
     print(json.dumps(result.model_dump(), indent=2))

@@ -23,8 +23,8 @@ with col_left:
     run_alignment = st.checkbox("Run lyric alignment (WhisperX — downloads ~360 MB on first run)", value=False)
 
 with col_right:
-    lyrics = st.text_area("Lyrics (required for alignment)", height=200,
-                          placeholder="Paste song lyrics here…")
+    lyrics = st.text_area("Lyrics (optional — leave blank to auto-transcribe with Whisper large-v3)", height=200,
+                          placeholder="Paste song lyrics here, or leave blank…")
 
 run_btn = st.button("Run pipeline", type="primary", disabled=audio_file is None)
 
@@ -86,21 +86,19 @@ if not run_alignment:
         pass
     st.stop()
 
-if not lyrics.strip():
-    st.warning("Paste some lyrics to run alignment.")
-    st.stop()
-
 with st.status("Stage 3 — aligning lyrics (WhisperX)…", expanded=True) as status:
     from pipeline.align import align_lyrics
 
     t0 = time.perf_counter()
-    words = align_lyrics(audio, sr, lyrics)
+    words, effective_lyrics = align_lyrics(audio, sr, lyrics.strip() or None)
     elapsed = time.perf_counter() - t0
 
     st.write(f"✓ {len(words)} word timestamps  ·  {elapsed:.2f}s")
+    if not lyrics.strip():
+        st.info("Auto-transcribed lyrics shown below.")
 
     # Word count sanity check
-    expected_words = len(lyrics.split())
+    expected_words = len(effective_lyrics.split())
     delta = len(words) - expected_words
     if abs(delta) > expected_words * 0.1:
         st.warning(f"⚠ Expected ~{expected_words} words, got {len(words)} "
@@ -124,7 +122,7 @@ with st.status("Stage 4 — merging chords + lyrics…", expanded=True) as statu
     from pipeline.merge import merge
 
     t0 = time.perf_counter()
-    lines = merge(chords, words, lyrics)
+    lines = merge(chords, words, effective_lyrics)
     elapsed = time.perf_counter() - t0
 
     st.write(f"✓ {len(lines)} lyric lines  ·  {elapsed:.2f}s")
