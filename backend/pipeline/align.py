@@ -64,18 +64,14 @@ def align_lyrics(
     # Step 4: Determine the displayed lyrics text.
     if lyrics is not None:
         effective_lyrics = _wrap_long_lines(lyrics)
-    elif language == "en":
-        raw = "\n".join(s["text"].strip() for s in whisper_segments)
-        effective_lyrics = _wrap_long_lines(raw)
     else:
-        # Non-English: run a second Whisper pass to translate to English, then
-        # remap the word timings from the original-language alignment onto the
-        # translated words so chords stay anchored to the right moments.
-        translate_result = whisper_mdl.transcribe(audio_16k, batch_size=8, task="translate")
-        trans_segments = translate_result.get("segments", [])
-        english_text = "\n".join(s["text"].strip() for s in trans_segments)
-        effective_lyrics = _wrap_long_lines(english_text)
-        timings = _remap_to_translation(timings, whisper_segments, trans_segments)
+        raw = "\n".join(s["text"].strip() for s in whisper_segments)
+        if language != "en":
+            # Transliterate non-Latin scripts to Latin characters so the chord
+            # sheet is readable without knowing the original script. Pronunciation
+            # is preserved; meaning is NOT translated.
+            raw = _transliterate(raw)
+        effective_lyrics = _wrap_long_lines(raw)
 
     return timings, effective_lyrics
 
@@ -121,44 +117,17 @@ def _forced_align(
     return _timings_from_segments(segments)
 
 
-def _remap_to_translation(
-    orig_timings: list[WordTiming],
-    orig_segments: list[dict],
-    trans_segments: list[dict],
-) -> list[WordTiming]:
-    """Replace original-language words with English translation.
-
-    For each segment pair, the translated words are distributed across the same
-    time window as the original-language word timings, preserving the chord
-    anchoring established by the forced alignment pass.
-    """
-    result: list[WordTiming] = []
-
-    for orig_seg, trans_seg in zip(orig_segments, trans_segments):
-        seg_timings = [
-            t for t in orig_timings
-            if orig_seg["start"] <= t.start <= orig_seg["end"]
-        ]
-        trans_words = trans_seg["text"].split()
-        if not trans_words:
-            continue
-
-        t_start = seg_timings[0].start if seg_timings else orig_seg["start"]
-        t_end = seg_timings[-1].end if seg_timings else orig_seg["end"]
-        duration = max(t_end - t_start, 0.01)
-        step = duration / len(trans_words)
-
-        for i, word in enumerate(trans_words):
-            result.append(WordTiming(
-                word=word,
-                start=t_start + i * step,
-                end=t_start + (i + 1) * step,
-            ))
-
-    return result
-
-
 # ── helpers ───────────────────────────────────────────────────────────────────
+
+
+def _transliterate(text: str) -> str:
+    """Convert any Unicode script to Latin characters using anyascii.
+
+    Preserves pronunciation (romanization), does not translate meaning.
+    e.g. Tamil "வணக்கம்" → "vanakkam"
+    """
+    from anyascii import anyascii
+    return anyascii(text)
 
 def _map_lyrics_to_segments(
     whisper_segments: list[dict],
